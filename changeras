@@ -1,0 +1,100 @@
+#For dobrada
+#50->101
+#150->201
+
+from wialon import Wialon, WialonError
+import re
+
+import urllib
+import xml.dom.minidom
+#import xlwt
+#from xlrd import open_workbook
+import requests
+import json
+
+user_res='0617_Orsha'  #user and name of resource
+
+#login
+wialon_api = Wialon()
+result = wialon_api.core_login(user=user_res, password='4645656')
+wialon_api.sid = result['eid']
+print (wialon_api.sid)
+
+#get_resources with reports and geozones (flag:12289)
+spec2={"itemsType":"avl_resource","propName":"sys_name","propValueMask":"*","sortType":"sys_name"}
+params={"spec":spec2,"force":1,"flags":12289,"from":0,"to":0}
+params=str(params).encode('utf-8')
+rr=requests.post('https://hst-api.wialon.com/wialon/ajax.html?svc=core/search_items&params='+params+'&sid='+result['eid'],headers={'Content-Type':'application/x-www-form-urlencoded'})
+
+#generate list of geozone id
+geozones=''
+geo_ids=[]
+for i in rr.json()["items"]:
+    try:
+        geozones=i['zl']
+        for j in geozones:
+            geo_ids.append(geozones[j]['id'])
+    except:
+        pass
+print geo_ids
+
+#find id of resource
+id_res=0
+for i in rr.json()["items"]:
+    if (i['nm']==user_res):
+        id_res=i['id']
+        print id_res
+
+#geo_det - request for detail info about zones
+#this info will be used in update request
+#updating with same params except:
+#w - radius of zone
+#p[0]['r'] - radius of image of zone
+geo_det=wialon_api.resource_get_zone_data(itemId=id_res,col=geo_ids,flag=0)
+print '------------------'
+#print geo_det
+num=0
+geo50101=0
+qqq=0
+geo150201=0
+www=0
+for i in geo_det:
+    gg=geo_det[num]
+    num+=1
+    itemIdz=id_res
+    idz=gg['id']
+    callModez='update'
+    nz=gg['n']
+    dz=gg['d']
+    tz=gg['t']
+    if (gg['w']==50):
+        wz=101
+        geo50101+=1
+    elif (gg['w']==150):
+        wz=201
+        geo150201+=1
+    else:
+        continue
+        #wz=gg['w']
+    fz=gg['f']
+    cz=gg['c']
+    pz=gg['p']
+    if (gg['p'][0]['r']==50):
+        pz[0]['r']=101
+        qqq+=1
+    elif (gg['p'][0]['r']==150):
+        pz[0]['r']=201
+        www+=1
+    else:
+        continue
+    geo_upd=wialon_api.resource_update_zone(itemId=itemIdz,id=idz,callMode=callModez,
+                                    n=nz,d=dz,t=tz,w=wz,f=fz,c=cz,p=pz)
+    #print geo_upd
+print 'Allgeozones: ',num
+print 'Converted 50 to 101: ',geo50101
+print 'Converted 100 to 201: ',geo150201
+print 'pictures 50 to 101: ',qqq
+print 'pictures 100 to 201: ',www
+
+
+
